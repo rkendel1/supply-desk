@@ -2,9 +2,16 @@
 /* eslint-disable */
 import { createApi } from "@feltdb/feltkit/client";
 import type * as app_module from "../app.js";
+import type * as audit_module from "../audit.js";
+import type * as authority_module from "../authority.js";
+import type * as dashboard_module from "../dashboard.js";
+import type * as demo_module from "../demo.js";
+import type * as exceptions_module from "../exceptions.js";
 import type * as inbox_module from "../inbox.js";
-import type * as projects_module from "../projects.js";
-import type * as tasks_module from "../tasks.js";
+import type * as invoices_module from "../invoices.js";
+import type * as payments_module from "../payments.js";
+import type * as purchasing_module from "../purchasing.js";
+import type * as vendors_module from "../vendors.js";
 
 /** Typed references to every query and mutation. Type-only imports: no backend code reaches the browser. */
-export const api = createApi<{ "app": typeof app_module; "inbox": typeof inbox_module; "projects": typeof projects_module; "tasks": typeof tasks_module }>();
+export const api = createApi<{ "app": typeof app_module; "audit": typeof audit_module; "authority": typeof authority_module; "dashboard": typeof dashboard_module; "demo": typeof demo_module; "exceptions": typeof exceptions_module; "inbox": typeof inbox_module; "invoices": typeof invoices_module; "payments": typeof payments_module; "purchasing": typeof purchasing_module; "vendors": typeof vendors_module }>();
