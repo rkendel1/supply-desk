@@ -63,7 +63,13 @@ export interface ReconcileResult {
   authorizedCents: number;
 }
 
-export const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** "$12,400.00". Formatted by hand: the AppBoundry guest engine has no Intl, so toLocaleString differs there. */
+export function money(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(Math.round(cents));
+  const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${sign}$${whole}.${String(abs % 100).padStart(2, "0")}`;
+}
 const withTolerance = (cents: number, bps: number) => Math.floor((cents * (10_000 + bps)) / 10_000);
 
 export function lineTotal(lines: LineInput[]): number {

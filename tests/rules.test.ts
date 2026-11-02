@@ -59,3 +59,8 @@ test("shorter payment terms than agreed and lines that do not add up", () => {
   assert.equal(terms.varianceCents, 0, "a terms change has no monetary variance");
   assert.deepEqual(codes(reconcile(base({ totalCents: 1_000_500 }))), ["amount_over_po", "total_mismatch"]);
 });
+
+test("money is formatted without Intl, identically in Node and in an artifact", async () => {
+  const { money } = await import("../feltkit/_rules.js");
+  assert.deepEqual([money(1_240_000), money(5), money(100_000_000), money(-240_000)], ["$12,400.00", "$0.05", "$1,000,000.00", "-$2,400.00"]);
+});

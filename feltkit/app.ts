@@ -27,7 +27,7 @@ export const app = feltkit({
     // The AP agent may receive invoices, investigate, gather evidence and propose. It holds
     // no decide, payment or authority permission, and the application refuses decisions from
     // any non-person principal regardless of role.
-    agent: [...READ, "invoices.submit", "invoices.reconcile", "exceptions.investigate", "exceptions.propose", "evidence.write", "files.read", "files.write", "notifications.send", "webhooks.emit", "webhooks.deliver"],
+    agent: [...READ, "invoices.submit", "invoices.reconcile", "exceptions.investigate", "exceptions.propose", "evidence.write", "files.read", "files.write", "notifications.send", "webhooks.emit", "webhooks.deliver", "feltkit.agent.*"],
     // Auditors read everything, including the audit trail.
     auditor: [...READ, "files.read", "notifications.read", "feltkit.agent.read"],
     // Platform administration in Studio → Services (not part of the AP process).

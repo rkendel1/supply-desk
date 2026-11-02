@@ -10,7 +10,10 @@
     "test": "feltkit test",
     "inspect": "feltkit inspect",
     "deploy": "feltkit deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:app": "feltkit build --target appboundry",
+    "verify:app": "node scripts/verify-artifact.mjs supply-desk.app",
+    "agent": "node scripts/agent-over-mcp.mjs"
   },
   "dependencies": {
     "@feltdb/feltkit": "^0.3.10",
@@ -24,5 +27,6 @@
     "@vitejs/plugin-react": "5.1.0",
     "typescript": "5.9.3",
     "vite": "7.3.7"
-  }
+  },
+  "description": "SupplyDesk: vendor operations and accounts payable, a FeltKit reference application."
 }
