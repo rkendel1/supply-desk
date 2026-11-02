@@ -2,20 +2,12 @@ import { fail, s } from "@feltdb/feltkit";
 import { app, approvalAuthority, events, evidence, exceptions, invoices, purchaseOrders, vendors } from "./app.js";
 import { record } from "./_audit.js";
 import { money } from "./_rules.js";
+import { EventView, EvidenceView, ExceptionView, InvoiceView, PurchaseOrderView, VendorView } from "./_views.js";
 
 const STATUS = ["open", "investigating", "proposed", "approved", "rejected", "cleared"] as const;
 const CLOSED = new Set(["approved", "rejected", "cleared"]);
 
-const ExceptionView = s.object({
-  id: s.string(),
-  invoiceId: s.string(),
-  vendorId: s.string(),
-  status: s.enum(STATUS),
-  findings: s.array(s.object({ code: s.string(), message: s.string(), varianceCents: s.integer() }, { additionalProperties: true })),
-  varianceCents: s.integer(),
-  assignee: s.optional(s.string()),
-}, { additionalProperties: true });
-const Loose = s.object({}, { additionalProperties: true });
+
 
 export const list = app.query({
   access: "exceptions.read",
@@ -30,11 +22,11 @@ export const get = app.query({
   args: { id: s.string() },
   returns: s.object({
     exception: ExceptionView,
-    invoice: Loose,
-    vendor: Loose,
-    purchaseOrder: s.nullable(Loose),
-    evidence: s.array(Loose),
-    history: s.array(Loose),
+    invoice: InvoiceView,
+    vendor: VendorView,
+    purchaseOrder: s.nullable(PurchaseOrderView),
+    evidence: s.array(EvidenceView),
+    history: s.array(EventView),
     vendorHistory: s.object({ invoices: s.integer(), exceptions: s.integer(), overridesApproved: s.integer(), rejected: s.integer() }),
   }),
   capability: { name: "exceptions.get", description: "Everything needed to investigate an exception: the findings, the invoice, its vendor and purchase order, gathered evidence, the vendor's track record, and the exception's history." },
@@ -42,8 +34,8 @@ export const get = app.query({
     const exception = await ctx.db.get(exceptions, id);
     if (!exception) fail("NOT_FOUND", `No exception ${id}.`);
     const [invoice, vendor, po, ev, history, vendorInvoices, vendorExceptions] = await Promise.all([
-      ctx.db.get(invoices, exception.invoiceId),
-      ctx.db.get(vendors, exception.vendorId),
+      ctx.db.get(invoices, exception.invoiceId).then((r) => r ?? fail("NOT_FOUND", `No invoice ${exception.invoiceId}.`)),
+      ctx.db.get(vendors, exception.vendorId).then((r) => r ?? fail("NOT_FOUND", `No vendor ${exception.vendorId}.`)),
       exception.poId ? ctx.db.get(purchaseOrders, exception.poId) : Promise.resolve(null),
       ctx.db.find(evidence, { exceptionId: id }, { orderBy: [{ field: "addedAt", direction: "asc" }] }),
       ctx.db.find(events, { invoiceId: exception.invoiceId }, { orderBy: [{ field: "at", direction: "asc" }] }),
@@ -52,8 +44,8 @@ export const get = app.query({
     ]);
     return {
       exception,
-      invoice: invoice ?? {},
-      vendor: vendor ?? {},
+      invoice,
+      vendor,
       purchaseOrder: po,
       evidence: ev,
       history,

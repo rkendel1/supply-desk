@@ -1,31 +1,10 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app, exceptions, invoices } from "./app.js";
 import { settle, submitInvoice } from "./_invoicing.js";
+import { InvoiceView, ReconciliationView } from "./_views.js";
 
-const InvoiceLine = s.object({ sku: s.string(), description: s.string(), quantity: s.integer(), unitPriceCents: s.integer() });
-export const InvoiceView = s.object({
-  id: s.string(),
-  vendorId: s.string(),
-  invoiceNumber: s.string(),
-  poNumber: s.optional(s.string()),
-  lines: s.array(InvoiceLine),
-  totalCents: s.integer(),
-  paymentTermsDays: s.integer(),
-  invoiceDate: s.string(),
-  dueDate: s.string(),
-  status: s.enum(["received", "exception", "approved", "rejected", "scheduled", "paid"]),
-  approvalBasis: s.optional(s.enum(["three_way_match", "override"])),
-  exceptionId: s.optional(s.string()),
-}, { additionalProperties: true });
-
-const Finding = s.object({ code: s.string(), message: s.string(), varianceCents: s.integer() }, { additionalProperties: true });
-const Reconciliation = s.object({
-  invoiceId: s.string(),
-  status: s.enum(["approved", "exception"]),
-  findings: s.array(Finding),
-  varianceCents: s.integer(),
-  exceptionId: s.nullable(s.string()),
-});
+const InvoiceLine = s.object({ sku: s.string({ minLength: 1, maxLength: 40 }), description: s.string({ minLength: 1, maxLength: 200 }), quantity: s.integer({ minimum: 0 }), unitPriceCents: s.integer({ minimum: 0 }) });
+const Reconciliation = ReconciliationView;
 
 export const list = app.query({
   access: "invoices.read",

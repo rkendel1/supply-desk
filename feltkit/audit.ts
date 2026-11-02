@@ -1,18 +1,8 @@
 import { s } from "@feltdb/feltkit";
 import { app, events } from "./app.js";
+import { EventView } from "./_views.js";
 
-const Event = s.object({
-  id: s.string(),
-  subjectType: s.string(),
-  subjectId: s.string(),
-  invoiceId: s.optional(s.string()),
-  type: s.string(),
-  actor: s.string(),
-  actorType: s.string(),
-  at: s.number(),
-  requestId: s.string(),
-  data: s.optional(s.record(s.unknown())),
-}, { additionalProperties: true });
+const Event = EventView;
 
 export const list = app.query({
   access: "audit.read",

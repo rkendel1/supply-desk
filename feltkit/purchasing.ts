@@ -1,18 +1,10 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app, purchaseOrders, vendors } from "./app.js";
 import { record } from "./_audit.js";
+import { PurchaseOrderView } from "./_views.js";
 import { lineTotal, money } from "./_rules.js";
 
-const PoLine = s.object({ sku: s.string(), description: s.string(), quantity: s.integer(), unitPriceCents: s.integer(), receivedQuantity: s.integer() });
-const PurchaseOrder = s.object({
-  id: s.string(),
-  number: s.string(),
-  vendorId: s.string(),
-  status: s.enum(["open", "closed", "cancelled"]),
-  lines: s.array(PoLine),
-  totalCents: s.integer(),
-  paymentTermsDays: s.integer(),
-}, { additionalProperties: true });
+const PurchaseOrder = PurchaseOrderView;
 
 export const list = app.query({
   access: "purchasing.read",

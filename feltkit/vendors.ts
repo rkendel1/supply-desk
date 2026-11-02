@@ -1,15 +1,9 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app, vendors } from "./app.js";
+import { VendorView } from "./_views.js";
 import { record } from "./_audit.js";
 
-const Vendor = s.object({
-  id: s.string(),
-  name: s.string(),
-  status: s.enum(["active", "on_hold"]),
-  paymentTermsDays: s.integer(),
-  contactEmail: s.optional(s.string()),
-  holdReason: s.optional(s.string()),
-}, { additionalProperties: true });
+const Vendor = VendorView;
 
 export const list = app.query({
   access: "vendors.read",
