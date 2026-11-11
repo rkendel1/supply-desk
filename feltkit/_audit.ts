@@ -4,19 +4,13 @@
  * Each event carries the AppPort request id, which links it to FeltKit's activity log
  * (Studio → Activity): the capability invoked, the authorization decision, and the writes
  * FeltDB committed.
+ *
+ * Order: `seq` is a FeltDB sequence per invoice (or per subject, for events outside an invoice),
+ * allocated in the writing transaction, so an invoice's history is ordered by the database, across
+ * instances and restarts. `at` is wall-clock time, for display and the company-wide feed.
  */
 import type { MutationCtx } from "@feltdb/feltkit";
 import { events } from "./app.js";
-
-/**
- * Event time in milliseconds, strictly increasing within this process (sub-millisecond steps
- * when several events share a millisecond), so the trail sorts in the order things happened.
- */
-let lastAt = 0;
-function eventTime(): number {
-  lastAt = Math.max(Date.now(), lastAt + 0.001);
-  return lastAt;
-}
 
 type Subject = "vendor" | "purchaseOrder" | "invoice" | "exception" | "authority";
 
@@ -29,7 +23,8 @@ export async function record(ctx: MutationCtx, subjectType: Subject, subjectId: 
     type,
     actor: who.id,
     actorType: who.type,
-    at: eventTime(),
+    at: Date.now(),
+    seq: await ctx.db.sequence(`audit:${invoiceId ?? (subjectType === "invoice" ? subjectId : `${subjectType}:${subjectId}`)}`),
     requestId: ctx.requestId,
     ...(data ? { data } : {}),
   });

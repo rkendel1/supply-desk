@@ -209,3 +209,39 @@ test("a submission that fails writes nothing; delegation cannot be self-granted"
     await t.close();
   }
 });
+
+test("webhook events are recorded with the change and sent only after it commits (ctx.afterCommit)", async () => {
+  const { t, northwind } = await seeded();
+  try {
+    type Outbox = { effect: { service: string; type?: string }; state: string; principalId: string };
+    const outbox = async () => ((await t.runtime.instance.handle("app").collection("_feltkit_outbox").find({})) as Outbox[]).filter((r) => r.effect.service === "webhooks");
+    const before = (await outbox()).length;
+    // A submission that fails stages nothing, so nothing is announced.
+    await assert.rejects(t.as("grace").mutation(api.invoices.submit, { ...northwind12400("no-such-vendor") }), { code: "NOT_FOUND" });
+    assert.equal((await outbox()).length, before);
+
+    const { exceptionId, result } = await proposedOverride(t, northwind);
+    await t.as("ada").mutation(api.exceptions.decide, { id: exceptionId, outcome: "approve", note: "Requested by ops." });
+    await t.as("ada").mutation(api.payments.schedule, { invoiceId: result.invoiceId });
+    const sent = (await outbox()).slice(before);
+    assert.deepEqual(sent.map((r) => r.effect.type).sort(), ["exception.decided", "exception.opened", "exception.proposed", "invoice.approved", "invoice.received", "payment.scheduled"]);
+    assert.ok(sent.every((r) => r.state === "done"), "each was performed after its commit");
+    assert.equal(sent.find((r) => r.effect.type === "invoice.received")!.principalId, "ap-agent", "as the caller");
+  } finally {
+    await t.close();
+  }
+});
+
+test("an invoice's history is ordered by a FeltDB sequence, not by a clock", async () => {
+  const { t, northwind } = await seeded();
+  try {
+    const { result } = await proposedOverride(t, northwind);
+    const trail = await t.as("katherine").query(api.audit.list, { invoiceId: result.invoiceId });
+    const seqs = trail.map((e) => e.seq);
+    assert.deepEqual(seqs, [...seqs].sort((a, b) => b! - a!), "newest first by seq");
+    assert.deepEqual([...seqs].reverse(), seqs.map((_, i) => i + 1), "1..n with no gaps: one sequence per invoice, allocated with each write");
+    assert.equal(trail.at(-1)!.type, "invoice.received");
+  } finally {
+    await t.close();
+  }
+});

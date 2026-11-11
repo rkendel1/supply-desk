@@ -12,11 +12,10 @@
     "deploy": "feltkit deploy",
     "typecheck": "tsc --noEmit",
     "build:app": "feltkit build --target appboundry",
-    "verify:app": "node scripts/verify-artifact.mjs supply-desk.app",
     "agent": "node scripts/agent-over-mcp.mjs"
   },
   "dependencies": {
-    "@feltdb/feltkit": "^0.3.10",
+    "@feltdb/feltkit": "0.3.24",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
