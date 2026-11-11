@@ -18,7 +18,7 @@ match. When a vendor bills $12,400 against a $10,000 purchase order, SupplyDesk:
 The application owns the business rules and the authoritative state. An agent can do
 everything a clerk can, through the same capabilities, but it can't approve anything.
 
-Scaffolded with `npm create feltkit@latest` (create-feltkit 0.3.10, `tasks` template).
+Scaffolded with `npm create feltkit@latest` (create-feltkit 0.3.10, `tasks` template). Runs on FeltKit 0.3.24.
 
 ## Run it
 
@@ -102,10 +102,11 @@ The app adds no infrastructure of its own: no extra database, queue, service or 
 npm test
 ```
 
-16 tests:
+19 tests:
 
 - the reconciliation rules (`tests/rules.test.ts`);
-- the process end to end against a fresh FeltDB per test (`tests/process.test.ts`): the full $12,400 scenario with the exact audit sequence, agent and over-granted-agent refusal, four-eyes checks, authority limits, override-needs-evidence, receipt-then-re-match clearing an exception, duplicates and vendors on hold, approval routing, atomic failure, and state surviving a restart.
+- the process end to end against a fresh FeltDB per test (`tests/process.test.ts`): the full $12,400 scenario with the exact audit sequence, agent and over-granted-agent refusal, four-eyes checks, authority limits, override-needs-evidence, receipt-then-re-match clearing an exception, duplicates and vendors on hold, approval routing, atomic failure, state surviving a restart, webhook events sent only after their change commits, and an invoice's history ordered by a FeltDB sequence;
+- the same scenario against the compiled AppBoundry artifact (`tests/artifact.test.ts`).
 
 ## Portable artifact
 
@@ -113,29 +114,28 @@ npm test
 npm run build:app
 ```
 
-```bash
-npm run verify:app
-```
-
 `build:app` compiles `supply-desk.app` (`manifest.json`, `module.wasm` that imports nothing, and the frontend). FeltKit refuses the build if the backend uses anything an artifact can't provide. That's why SupplyDesk uses neither `ctx.agent` nor `app.integration`.
 
-`verify:app` runs `scripts/verify-artifact.mjs`. It loads **only** the `.app` directory and drives
-the whole exception scenario through the compiled module, playing the host with an in-memory
-store. It passes from a directory containing nothing but the artifact and the script.
+`tests/artifact.test.ts` (part of `npm test`) builds the artifact and runs the whole exception scenario
+against it alone, in FeltKit's reference host (`createArtifactTestApp`).
 
-What has **not** been verified: running under AppBoundry itself. The AppBoundry CLI on npm
-(`@appport/appboundry@1.1.1`) has no `run` command and doesn't read FeltKit 0.3.10's
-`appboundry.app/1` format. `verify-artifact.mjs` is a reference host for checking the artifact,
-not AppBoundry. It doesn't reproduce AppBoundry's storage, sessions, service implementations or
-independent schema checks. Under AppBoundry, Studio, `/mcp`, API keys, schedules and webhook
-*delivery* aren't available (FeltKit lists these as omitted when it builds).
+Running it under AppBoundry was checked with `@appport/appboundry` 1.11.1:
+
+```bash
+npx @appport/appboundry run supply-desk.app --accounts operator-sessions
+```
+
+`--accounts operator-sessions` is needed because AppBoundry doesn't serve built-in sign-up and sign-in.
+People get sessions from the operator (`appboundry admin users add`, `appboundry admin sessions issue`).
+Demo data, queries and the audit trail all worked over HTTP. Under AppBoundry, Studio, API keys,
+schedules and webhook *delivery* aren't available (FeltKit lists these as omitted when it builds).
 
 ## Known limits
 
-- **Service effects commit separately.** Notifications and webhook emits are separate from the mutation's FeltDB transaction (a FeltKit property). The handlers emit last, but a commit conflict after an emit could leave a notification for a change that didn't commit.
+- **Effects follow the commit.** Notifications and webhook events go through `ctx.afterCommit`: they're recorded in the mutation's transaction and sent after it commits, so a change that doesn't commit announces nothing.
 - **Demo scale.** List queries use `find`, which is capped; paging with `query` + cursor would be needed for real volumes.
 - **Payments are recorded, not executed.** SupplyDesk tracks scheduled and paid, and emits `payment.*` webhooks for a bank integration to act on. It moves no money.
-- **Event ordering** uses a per-process monotonic timestamp. With several servers, events in the same millisecond from different processes have no defined order.
+- **Event ordering.** An invoice's history is ordered by a FeltDB sequence (`seq`), across servers and restarts. The company-wide feed is ordered by time (`at`). Events recorded before `seq` existed have none.
 - **New self-service accounts** get the read-only `auditor` role. Real roles are assigned by an operator.
 
 ## FeltKit commands

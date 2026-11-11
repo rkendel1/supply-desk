@@ -23,6 +23,17 @@ export const contacts = app.collection("contacts", {
 
 Records carry `id` and `__version` (FeltDB's). Do not declare either. Writes are validated against the shape.
 
+FeltDB enforces the schema the collections compile to (types, required fields, no undeclared fields).
+
+- **References and constraints.** Declare a reference with `s.ref(otherCollection)`: it must
+  name an existing record, and a referenced record cannot be deleted. Declare uniqueness and
+  indexes in the third argument: `app.collection("contacts", {...}, { unique: [["email"]], indexes: [{ fields: ["stage"] }] })`.
+- **Changing a collection.** Adding an optional field is installed by itself. A required
+  field, a type change, a removed field or a removed populated collection needs an
+  `app.migration("name", (m) => m.update(contacts, (c) => ({ ...c, newField: value })))`.
+  `npx feltkit migrate --dry-run` shows the plan and the records that would fail. Never edit
+  or rename a migration that ran.
+
 ## Read
 
 ```ts
@@ -31,8 +42,17 @@ await ctx.db.find(contacts, { stage: "lead" }, { orderBy: [{ field: "name", dire
 await ctx.db.count(contacts, { ownerId });
 const page = await ctx.db.query(contacts, { where: [{ field: "stage", eq: "lead" }], orderBy: [{ field: "name", direction: "asc" }], limit: 25, cursor });
 // page.records, page.nextCursor, page.exhausted
+await ctx.db.search(messages, { text: "deploy café", where: { channelId }, limit: 20 }); // needs { search: ["text"] } on the collection
 ```
 
+`search` returns records whose declared `search` fields contain every word (case- and accent-insensitive),
+newest first, at most `limit` (≤ 100). It scans the records matching `where`, so always narrow it with an
+equality `where` on large collections. For live queries, filter by `id`, indexed, unique, reference or
+tenant fields: a query that reads `find(messages, { channelId })` re-runs only when that channel changes.
+
+`find` returns **every** match unless you pass `limit` (FeltKit reads FeltDB's pages for you), and `count`
+counts every match. `query` returns **one page** of at most 1,000 records: follow `nextCursor` until it
+is absent. For a large collection, page with `query` on a request path rather than `find` everything.
 `where` clauses support `eq`, `neq`, `lt`, `lte`, `gt`, `gte`. Queries are read-only and live in the client
 (`useQuery` re-runs when their data changes).
 
@@ -48,13 +68,16 @@ await ctx.db.delete(contacts, id);
 A mutation's writes are buffered and commit as **one FeltDB transaction** when the handler returns; if it throws,
 nothing is written.
 
+Records `ctx.db` returns are your own copies: change them freely; nothing is stored until you `patch` or `replace`.
+
 ## Consistency: what is guaranteed
 
 - **Atomic**: all of a mutation's writes, or none.
 - **Checked reads**: everything a mutation read — by id, by equality filter (including records that would newly
   match: phantoms), by range (conservatively), and whole collections — is checked at commit. If any of it changed,
-  the commit fails with `CONFLICT` and nothing is written. Retry the mutation; do not retry blindly in a loop
-  without a bound.
+  the commit fails with `CONFLICT` and `retryable: true`, and nothing is written. Retry the mutation; do not retry
+  blindly in a loop without a bound. A `CONFLICT` without `retryable` (a duplicate unique value, "already applied")
+  fails the same way again: do not retry it.
 - **Not guaranteed**: a consistent snapshot *while* a handler runs; checks for read-only mutations; fences against
   writes made through `ctx.unsafe.feltdb`.
 - Service effects (`ctx.services.*`) commit separately from the mutation.
@@ -76,4 +99,4 @@ Deleting records, bulk changes, schema changes that drop fields, or anything in 
 
 ## Compatibility
 
-`@feltdb/feltkit` 0.1.x on `@feltdb/core` 0.13.0. Details: the project's `docs/GUARANTEES.md`. Verified in Claude Code only.
+`@feltdb/feltkit` 0.3.x on `@feltdb/core` 0.21.0. Details: `npx feltkit docs guarantees` (node_modules/@feltdb/feltkit/docs/GUARANTEES.md). Verified in Claude Code only.

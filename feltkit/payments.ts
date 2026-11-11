@@ -18,7 +18,7 @@ export const schedule = app.mutation({
     const date = scheduledFor ?? invoice.dueDate;
     await ctx.db.patch(invoices, invoiceId, { status: "scheduled", payment: { scheduledFor: date, scheduledBy: who.id } });
     await record(ctx, "invoice", invoiceId, "payment.scheduled", { scheduledFor: date, amount: money(invoice.totalCents), dueDate: invoice.dueDate });
-    await ctx.services.webhooks?.emit("payment.scheduled", { invoiceId, vendorId: invoice.vendorId, amountCents: invoice.totalCents, scheduledFor: date });
+    ctx.afterCommit.webhooks.emit("payment.scheduled", { invoiceId, vendorId: invoice.vendorId, amountCents: invoice.totalCents, scheduledFor: date });
     return { invoiceId, status: "scheduled" as const, scheduledFor: date };
   },
 });
@@ -36,7 +36,7 @@ export const recordPayment = app.mutation({
     const payment = { ...invoice.payment, paidAt: Date.now(), reference: reference.trim(), recordedBy: who.id };
     await ctx.db.patch(invoices, invoiceId, { status: "paid", payment });
     await record(ctx, "invoice", invoiceId, "payment.recorded", { reference: payment.reference, amount: money(invoice.totalCents) });
-    await ctx.services.webhooks?.emit("payment.recorded", { invoiceId, vendorId: invoice.vendorId, amountCents: invoice.totalCents, reference: payment.reference });
+    ctx.afterCommit.webhooks.emit("payment.recorded", { invoiceId, vendorId: invoice.vendorId, amountCents: invoice.totalCents, reference: payment.reference });
     return { invoiceId, status: "paid" as const, scheduledFor: payment.scheduledFor, reference: payment.reference };
   },
 });

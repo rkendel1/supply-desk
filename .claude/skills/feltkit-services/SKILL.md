@@ -39,16 +39,40 @@ export const checkout = app.mutation({
   access: "orders.write",
   args: { orderId: s.string() },
   handler: async (ctx, { orderId }) => {
-    await ctx.services.jobs.enqueue("invoice.send", { orderId });          // runs later, as this caller
-    await ctx.services.webhooks.emit("order.paid", { orderId });           // to subscribed endpoints
-    await ctx.services.notifications.send({ recipient: "ada", type: "order", title: "Paid" });
+    ctx.afterCommit.jobs.enqueue("invoice.send", { orderId });             // runs later, as this caller, if this commits
+    ctx.afterCommit.webhooks.emit("order.paid", { orderId });              // to subscribed endpoints, if this commits
+    ctx.afterCommit.notifications.send({ recipient: "ada", type: "order", title: "Paid" });
     const region = await ctx.services.configuration.get("REGION");
     return { region };
   },
 });
 ```
 
-Service effects commit on their own: they are not part of the mutation's transaction.
+**Jobs run as whoever queued them, re-authorized each attempt:** that principal needs `jobs.create` to queue and
+`jobs.execute` for the run, plus the job mutation's own `access`. In tests, `t.as(...)` callers are signed in like
+production callers; `runServices()` returns `failed: { jobs, deliveries }` beside the attempt counts.
+
+**Service calls inside functions run as the caller.** Every role that can reach a function needs the service
+permissions that function uses: if `checkout` reads `configuration.get`, every role that calls `checkout` needs
+`configuration.read`. A refusal says so: `orders:checkout called configuration.get as grace (roles: clerk), which does
+not grant configuration.read`, with the file to change (`feltkit/app.ts`, roles).
+
+Service effects commit on their own: they are not part of the mutation's transaction. A notification or webhook
+sent from `ctx.services` stays sent if the mutation later fails at commit (`CONFLICT`). For effects that announce the
+mutation's change, use `ctx.afterCommit`:
+
+```ts
+ctx.afterCommit.notifications.send({ recipient: "ada", type: "order", title: "Paid" }); // only if this commits
+ctx.afterCommit.webhooks.emit("order.paid", { orderId });
+ctx.afterCommit.jobs.enqueue("invoice.send", { orderId });
+```
+
+Each is recorded in the mutation's transaction (`_feltkit_outbox`) and performed after the commit, as the caller.
+If the process stops in between, the services worker performs it later. A job or webhook delivery is created in
+the transaction that marks the effect done, so it exists once per committed effect; notifications are deduplicated
+by their idempotency key. Running the job and delivering the webhook are retried by the services (at least once). A failed effect stays `failed` with
+its error until an operator retries it: `npx feltkit outbox list --state failed`, `npx feltkit outbox retry <id>`.
+The same holds in an AppBoundry artifact (AppBoundry 1.5.0 or later).
 
 ## Configure a service
 
@@ -119,6 +143,6 @@ affect other systems. Confirm with the user before doing any of them.
 
 ## Compatibility
 
-`@feltdb/feltkit` 0.3.x with `@appport/services` 0.9.1 (shared instance; `credential.store` / `credential.status`; `servicesContract` for Managed FeltDB).
+`@feltdb/feltkit` 0.3.x with `@appport/services` 0.16.0 (shared instance; transactional job and webhook creation; `credential.store` / `credential.status`; `servicesContract` for Managed FeltDB).
 The console is development-only.
 Verified in Claude Code only.

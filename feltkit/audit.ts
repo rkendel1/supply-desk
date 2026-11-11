@@ -10,5 +10,6 @@ export const list = app.query({
   returns: s.array(Event),
   capability: { name: "audit.list", description: "The business audit trail, newest first: every transition, who caused it (person or agent), and the AppPort request id that links it to FeltKit's activity record. Filter by invoice or subject." },
   handler: async (ctx, { invoiceId, subjectId, limit }) =>
-    ctx.db.find(events, { ...(invoiceId ? { invoiceId } : {}), ...(subjectId ? { subjectId } : {}) }, { orderBy: [{ field: "at", direction: "desc" }], limit: limit ?? 100 }),
+    // An invoice's history is ordered by its sequence; the company-wide feed by time.
+    ctx.db.find(events, { ...(invoiceId ? { invoiceId } : {}), ...(subjectId ? { subjectId } : {}) }, { orderBy: [{ field: invoiceId ? "seq" : "at", direction: "desc" }], limit: limit ?? 100 }),
 });

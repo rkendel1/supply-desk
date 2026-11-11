@@ -95,4 +95,4 @@ Anything in production; deleting or restoring state; revoking sessions or keys; 
 
 ## Compatibility
 
-`@feltdb/feltkit` 0.1.x. Verified in Claude Code only.
+`@feltdb/feltkit` 0.3.x. Verified in Claude Code only.

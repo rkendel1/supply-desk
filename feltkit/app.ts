@@ -181,6 +181,8 @@ export const events = app.collection("events", {
   actor: s.string(),
   actorType: s.string(),
   at: s.number(),
+  /** Order within the invoice (or subject): a FeltDB sequence. Absent on events recorded before it existed. */
+  seq: s.optional(s.integer({ minimum: 1 })),
   requestId: s.string(),
   data: s.optional(s.record(s.unknown())),
-}, { description: "Append-only business audit trail; each event names the AppPort request that caused it." });
+}, { description: "Append-only business audit trail; each event names the AppPort request that caused it.", indexes: [{ fields: ["invoiceId", "seq"] }] });

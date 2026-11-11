@@ -50,10 +50,14 @@ Application capabilities are also tools directly (their MCP names come from the 
 1. `feltkit_context` first. Prefer capabilities with `allowed: true`. Do not try others to "see what happens".
 2. Claim the task you were given (`feltkit_agent_tasks` → `feltkit_agent_claim`), or create one.
 3. Gather facts with **observations** (`effect: "observation"`): they run immediately and are recorded with evidence.
-4. Propose **consequential** actions with a clear `reason`. They do not run until a person approves them in
-   Studio's Agent screen. **There is no approve tool, and you must not ask for one or route around it.** Tell the
+4. A capability with `approval: "required"` (in `feltkit_context`; `invoke: "propose"`) is refused if you call it
+   directly, even with the permission: always propose it. Service operations (`source: "services"`) are only
+   reachable through a proposal too.
+5. Propose **consequential** actions with a clear `reason`. A proposal does not run until a person approves it in
+   Studio's Agent screen. (A consequential capability without `approval: "required"` that you are `allowed` to call
+   also works as a direct tool call; the application chose not to require a person for it.) **There is no approve tool, and you must not ask for one or route around it.** Tell the
    user what is waiting and why.
-5. After approval, read `feltkit_agent_get`: each action has a `state` (`proposed`, `approved`, `executing`,
+6. After approval, read `feltkit_agent_get`: each action has a `state` (`proposed`, `approved`, `executing`,
    `succeeded`, `failed`, `interrupted`, `rejected`, `cancelled`), who proposed, approved, and ran it, and its
    outcome; the checkpoint cites the activity record FeltDB verified at commit. Report from that evidence, never
    from your expectation.
@@ -62,7 +66,7 @@ Application capabilities are also tools directly (their MCP names come from the 
    - `interrupted`: the outcome is **unknown** (a timeout, a cancellation, or a restart while it ran). It may have
      taken effect. Never propose the same action again to "make sure"; tell the user, who settles it in Studio
      after checking.
-6. `feltkit_agent_complete` with a factual summary. Completion is refused while any action is open (proposed,
+7. `feltkit_agent_complete` with a factual summary. Completion is refused while any action is open (proposed,
    approved, executing, or interrupted).
 
 Example: diagnose a failed job.
@@ -89,6 +93,6 @@ the source, run `npx feltkit test`, and let the user review. Record what you cha
 
 ## Compatibility
 
-`@feltdb/feltkit` 0.1.x, development server. FeltDB 0.13.0 agent state. There is no planner: decisions are yours, a
+`@feltdb/feltkit` 0.3.x, development server. FeltDB 0.21.0 agent state. There is no planner: decisions are yours, a
 playbook's, or the environment's model choosing among options the application built (a `decide` task); a model's
 choice is a proposal like yours. Verified in Claude Code only.

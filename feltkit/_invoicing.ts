@@ -69,7 +69,7 @@ export async function submitInvoice(ctx: MutationCtx, input: SubmitInput) {
   const id = await ctx.db.insert(invoices, fields);
   await record(ctx, "invoice", id, "invoice.received", { vendor: vendor.name, invoiceNumber: fields.invoiceNumber, poNumber: fields.poNumber ?? null, total: money(input.totalCents) });
   const outcome = await settle(ctx, { ...fields, id, __version: 0 });
-  await ctx.services.webhooks?.emit("invoice.received", { invoiceId: id, vendorId: input.vendorId, invoiceNumber: fields.invoiceNumber, totalCents: input.totalCents });
+  ctx.afterCommit.webhooks.emit("invoice.received", { invoiceId: id, vendorId: input.vendorId, invoiceNumber: fields.invoiceNumber, totalCents: input.totalCents });
   return { invoiceId: id, ...outcome };
 }
 
@@ -89,7 +89,7 @@ export async function settle(ctx: MutationCtx, invoice: Invoice) {
       await record(ctx, "exception", existing.id, "exception.cleared", { reason: "The invoice now matches its purchase order and receipts." }, invoice.id);
     }
     await record(ctx, "invoice", invoice.id, "invoice.approved", { basis: "three_way_match", by: "rule:three-way-match" });
-    await ctx.services.webhooks?.emit("invoice.approved", { invoiceId: invoice.id, basis: "three_way_match", totalCents: invoice.totalCents });
+    ctx.afterCommit.webhooks.emit("invoice.approved", { invoiceId: invoice.id, basis: "three_way_match", totalCents: invoice.totalCents });
     return { status: "approved" as const, findings: result.findings, varianceCents: 0, exceptionId: existing?.id ?? null };
   }
 
@@ -110,6 +110,6 @@ export async function settle(ctx: MutationCtx, invoice: Invoice) {
   });
   await ctx.db.patch(invoices, invoice.id, { status: "exception", exceptionId });
   await record(ctx, "exception", exceptionId, "exception.opened", { findings: result.findings.map((f) => ({ code: f.code, message: f.message })), varianceCents: result.varianceCents }, invoice.id);
-  await ctx.services.webhooks?.emit("exception.opened", { exceptionId, invoiceId: invoice.id, varianceCents: result.varianceCents, findings: result.findings.map((f) => f.code) });
+  ctx.afterCommit.webhooks.emit("exception.opened", { exceptionId, invoiceId: invoice.id, varianceCents: result.varianceCents, findings: result.findings.map((f) => f.code) });
   return { status: "exception" as const, findings: result.findings, varianceCents: result.varianceCents, exceptionId };
 }

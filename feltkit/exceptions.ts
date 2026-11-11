@@ -151,7 +151,7 @@ export const propose = app.mutation({
     const invoice = await ctx.db.get(invoices, exception.invoiceId);
     const approvers = (await ctx.db.find(approvalAuthority, {})).filter((a) => a.limitCents >= exception.varianceCents && a.principalId !== who.id && a.principalId !== invoice?.submittedBy);
     for (const a of approvers) {
-      await ctx.services.notifications.send({
+      ctx.afterCommit.notifications.send({
         recipient: a.principalId,
         type: "exception.awaiting_decision",
         title: `Decision needed: ${resolution} ${invoice?.invoiceNumber ?? "invoice"} (${money(exception.varianceCents)} variance)`,
@@ -160,7 +160,7 @@ export const propose = app.mutation({
         idempotencyKey: `exception.awaiting:${id}:${proposal.proposedAt}:${a.principalId}`,
       });
     }
-    await ctx.services.webhooks?.emit("exception.proposed", { exceptionId: id, resolution, proposedBy: who.id, varianceCents: exception.varianceCents });
+    ctx.afterCommit.webhooks.emit("exception.proposed", { exceptionId: id, resolution, proposedBy: who.id, varianceCents: exception.varianceCents });
     return updated;
   },
 });
@@ -226,10 +226,10 @@ export const decide = app.mutation({
     await record(ctx, "invoice", invoice.id, approved ? "invoice.approved" : "invoice.rejected", approved ? { basis: "override", by: who.id, exceptionId: id } : { by: who.id, exceptionId: id });
 
     if (exception.proposal.proposedBy !== who.id) {
-      await ctx.services.notifications.send({ recipient: exception.proposal.proposedBy, type: "exception.decided", title: `${who.id} ${approved ? "approved" : "rejected"} ${invoice.invoiceNumber}`, data: { exceptionId: id, invoiceId: invoice.id }, idempotencyKey: `exception.decided:${id}` });
+      ctx.afterCommit.notifications.send({ recipient: exception.proposal.proposedBy, type: "exception.decided", title: `${who.id} ${approved ? "approved" : "rejected"} ${invoice.invoiceNumber}`, data: { exceptionId: id, invoiceId: invoice.id }, idempotencyKey: `exception.decided:${id}` });
     }
-    await ctx.services.webhooks?.emit("exception.decided", { exceptionId: id, invoiceId: invoice.id, outcome: approved ? "approved" : "rejected", decidedBy: who.id });
-    await ctx.services.webhooks?.emit(approved ? "invoice.approved" : "invoice.rejected", { invoiceId: invoice.id, basis: approved ? "override" : undefined, totalCents: invoice.totalCents });
+    ctx.afterCommit.webhooks.emit("exception.decided", { exceptionId: id, invoiceId: invoice.id, outcome: approved ? "approved" : "rejected", decidedBy: who.id });
+    ctx.afterCommit.webhooks.emit(approved ? "invoice.approved" : "invoice.rejected", { invoiceId: invoice.id, basis: approved ? "override" : undefined, totalCents: invoice.totalCents });
     return { status: approved ? ("approved" as const) : ("rejected" as const), exceptionId: id, invoiceStatus: approved ? "approved" : "rejected" };
   },
 });
