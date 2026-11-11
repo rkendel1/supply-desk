@@ -1,0 +1,18 @@
+{
+  "report": "measure.json",
+  "classify": [
+    {
+      "path": "scripts/agent-over-mcp.mjs",
+      "class": "experience",
+      "reason": "the scripted AP agent: a client of the app over MCP, like the UI"
+    },
+    {
+      "path": "feltkit/_audit.ts",
+      "class": "infrastructure",
+      "reason": "SupplyDesk's own audit-trail writer (app.auditTrail can't express its cross-subject invoiceId index)"
+    }
+  ],
+  "acknowledged": {
+    "audit-trail:feltkit/app.ts": "the events collection; it indexes invoiceId across subjects, which app.auditTrail doesn't express"
+  }
+}

@@ -99,7 +99,11 @@ validation and the transaction: do not use it unless the user asks and understan
 - **Effects that announce the change**: `ctx.afterCommit.notifications.send(...)`, `.webhooks.emit(...)`,
   `.jobs.enqueue(...)` happen only if the mutation commits (recorded in its transaction, performed after it).
   `ctx.services.*` effects happen even if the commit is later refused.
-- **Ordering an append-only log** written in the same transaction (audit events): ``seq: await ctx.db.sequence(`audit:${invoiceId}`)``
+- **A business audit trail**: `export const events = app.auditTrail("events", { subjects: ["invoice"] as const })`,
+  then `await events.record(ctx, { subject: "invoice", id, type: "invoice.approved", data })` next to the change, and
+  `events.history(ctx, "invoice", id)` to read it in order. Each event has the actor (or `anonymous`), the request
+  id and a per-subject `seq`, and commits with the change. Don't build your own (docs/TRANSACTIONS.md §9).
+- **Ordering any other append-only log** written in the same transaction: ``seq: await ctx.db.sequence(`audit:${invoiceId}`)``
   and `orderBy: [{ field: "seq", direction: "asc" }]`. Never order by `Date.now()`: several writes share a millisecond.
   Order is per stream (the name): one stream per subject, so unrelated writers never contend. Writers to one stream
   serialize (`CONFLICT`); add `retry: { sequenceConflicts: 3 }` to the mutation to have it re-run instead, if its
@@ -176,6 +180,13 @@ test("a member completes a task", async () => {
 
 Each test app gets an isolated FeltDB instance. Test denials too (`app.as("viewer")` should be refused writes).
 
+**Callers in tests.** `app.query(...)` / `app.mutation(...)` on the test app itself are **anonymous**: no session,
+like a visitor on a public page. Use that for `access: "public"` functions. `app.as({ id, type: "user", roles: [] })`
+is a *signed-in* account with no roles, a different caller: a staff-only function refuses it with FORBIDDEN, while
+it refuses an anonymous caller with UNAUTHORIZED. `app.as(who, { session: false })` is a known principal without a
+session. An anonymous mutation can't stage `ctx.afterCommit.notifications/webhooks/jobs` (they run as the caller);
+stage `ctx.afterCommit.agent(name, input)` for a declared `app.agent` instead.
+
 ## Portability (AppBoundry)
 
 `npx feltkit build --target appboundry` compiles the app into `<name>.app` (runs without the project or FeltKit). It
@@ -184,7 +195,8 @@ refuses, naming file and line: `ctx.agent`, `ctx.unsafe`, `app.integration`,
 artifact has no locale data; format for people in the frontend). It omits Studio, `/mcp`, API keys, schedules and
 webhook delivery. A plain `feltkit build` prints the same list as a warning. If the user wants the artifact, avoid
 these from the start, and test it with `createArtifactTestApp("<name>.app")` from `@feltdb/feltkit/testing` (same
-`as(who).query/mutation` calls). No npm release of AppBoundry runs the format yet; it is built from its repository.
+`as(who).query/mutation` calls). Serve it with `npx @appport/appboundry run <name>.app` (an app with built-in accounts
+also needs `--accounts operator-sessions`: people then get sessions from the operator).
 
 ## When to stop and ask
 
