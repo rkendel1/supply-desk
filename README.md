@@ -144,3 +144,28 @@ schedules and webhook *delivery* aren't available (FeltKit lists these as omitte
 `npm run typecheck` work as in any FeltKit app. See the FeltKit documentation at
 <https://github.com/rkendel1/feltkit#readme>. `npx feltkit skills install` added the FeltKit skills for
 coding agents to `.claude/skills/`.
+
+## Public demo deployment
+
+Every FeltKit starter deploys as a public demo the same way:
+
+```bash
+npm ci
+npm run build
+npm run start:demo
+```
+
+`start:demo` (`scripts/demo-server.mjs`) runs the built app in FeltKit's **development** environment, so the
+app's declared dev users are on offer and a visitor is signed in as one automatically: no login page, straight to
+the app. Once the server is up it loads the demo data through the app's own functions (`scripts/demo-seed.ts`: the demo company). Re-running is a no-op.
+
+| Variable | Effect |
+|---|---|
+| `PORT` / `HOST` | where it listens (default: FeltKit's port from 3000, `0.0.0.0`) |
+| `FELTKIT_STATE_DIR` | where the demo data lives; point it at a volume to keep it across restarts |
+| `DEMO_SEED=0` | serve without loading demo data |
+
+**Demo only.** Every visitor acts as a dev user, with that user's roles (including admin and operator roles), on
+one shared copy of the data, and development mode relaxes production safeguards. Never give a demo deployment real
+provider keys, credentials or customer data, and use `npm start` (production) for anything real.
+
