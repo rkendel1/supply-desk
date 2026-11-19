@@ -18,7 +18,7 @@
     "measure": "feltkit measure"
   },
   "dependencies": {
-    "@feltdb/feltkit": "0.3.25",
+    "@feltdb/feltkit": "0.3.34",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
